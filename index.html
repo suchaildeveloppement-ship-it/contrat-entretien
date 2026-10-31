@@ -113,6 +113,8 @@ const PAIEMENTS=["Annuel à la signature","Prélèvement mensuel","Virement à r
 const GROUPS={
  ui:["Unité intérieure",["Filtres : état, nettoyage ou remplacement","Batterie évaporateur : encrassement, nettoyage, traitement bactéricide","Turbine et moteur : propreté, jeu, bruit, intensité","Bac à condensats, siphon et évacuation : propres et sans fuite"]],
  gaine:["Gaines et réseau aéraulique",["Pompe de relevage et flotteur de sécurité : test","Gaines : état, isolation, absence de condensation ou de fuite d'air","Grilles, bouches et clapets : propreté, réglage, débit équilibré","Plénum et raccords : étanchéité","Débit d'air à plusieurs bouches"]],
+ zoning:["Zoning (gainable)",["Zoning : test du coffret de régulation et des clapets ou volets motorisés","Thermostats : piles, affichage, test de chaque zone"]],
+ wifi:["Connexion internet (Wi-Fi)",["Module Wi-Fi : test de la connexion et de l'application"]],
  ue:["Unité extérieure",["Batterie condenseur : nettoyage","Ventilateur : état, fixations, vibrations","Support et châssis : corrosion, stabilité","Dégagement autour de l'unité"]],
  frigo:["Circuit frigorifique",["Pressions, surchauffe et sous-refroidissement","Recherche de fuite visuelle et au détecteur","Isolation des liaisons frigorifiques"]],
  elec:["Électrique et régulation",["Serrage des connexions","Tension et intensité du compresseur (attention au mode inverter)","Sondes, thermostat ou télécommande","Test de tous les modes : froid, chaud, déshumidification, ventilation"]],
@@ -122,7 +124,8 @@ const GROUPS={
  ecs:["PAC air-eau – Eau chaude sanitaire (si ballon)",["État de l'anode","Groupe de sécurité","Appoint électrique","Cycle anti-légionelle"]]};
 const DEF={mono:["ui","ue","frigo","elec","mes"],multi:["ui","ue","frigo","elec","mes"],gainable:["ui","gaine","ue","frigo","elec","mes"],tertiaire:["ui","gaine","ue","frigo","elec","mes"],pac:["ue","frigo","hyd","pelec","ecs"]};
 const defaults=t=>(DEF[t]||[]).flatMap(k=>GROUPS[k][1]);
-const allItems=Object.values(GROUPS).flatMap(g=>g[1]);
+const allItemsFor=e=>Object.entries(GROUPS).filter(([k])=>(k!=="zoning"||e.zoning)&&(k!=="wifi"||e.wifi)).flatMap(([,g])=>g[1]);
+const defFor=(e,t)=>[...defaults(t),...(e.zoning?GROUPS.zoning[1]:[]),...(e.wifi?GROUPS.wifi[1]:[])];
 const DEFT={mono:"180",multi:"180",multiUI:"50",gainable:"250",tertiaire:"400",pac:"380",deplacement:"",mo:""};
 const TLAB={mono:"Mono split (une seule unité)",multi:"Multi split : base (par visite)",multiUI:"Multi split : par unité intérieure",gainable:"Mono split gainable",tertiaire:"Petit tertiaire ou multi split > 12 kW",pac:"PAC air-eau",deplacement:"Déplacement dépannage (€ HT)",mo:"Main-d'œuvre dépannage (€ HT / heure)"};
 const KEY={ent:"ct_entreprise",draft:"ct_draft",list:"ct_contrats",tar:"ct_tarifs",cnt:"ct_compteur"};
@@ -137,13 +140,13 @@ const ls={get(k,def){try{const v=localStorage.getItem(k);return v?JSON.parse(v):
  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}};
 const nextNum=()=>{const n=(ls.get(KEY.cnt,0)||0)+1;ls.set(KEY.cnt,n);return "CE-"+new Date().getFullYear()+"-"+String(n).padStart(3,"0")};
 const unit=()=>({ref:"",serie:"",kw:""});
-const eq=()=>({type:"",marque:"",nbUI:"1",fluide:"",fluideAutre:"",charge:"",controles:[],etanch:false,etanchPrix:"",prixManuel:"",lieu:"",ue:unit(),ui:{ref:"",serie:""},photo:""});
+const eq=()=>({zoning:false,zMarque:"",zSorties:"",zThermos:"",zSerie:"",zSerieTh:"",wifi:false,wMarque:"",wSerie:"",type:"",marque:"",nbUI:"1",fluide:"",fluideAutre:"",charge:"",controles:[],etanch:false,etanchPrix:"",prixManuel:"",lieu:"",ue:unit(),ui:{ref:"",serie:""},photo:""});
 const blank=()=>({id:Date.now().toString(36),
  entreprise:ls.get(KEY.ent,{nom:"",adresse:"",cp:"",ville:"",siret:"",tel:"",email:"",attestation:"",assureur:"",police:""}),
  client:{nom:"",numero:"",tel:"",email:"",adresse:"",cp:"",ville:"",type:"Particulier",qualite:"Propriétaire"},
  contrat:nextNum(),date:today(),debut:today(),lieu:"",tva:"10",paiement:PAIEMENTS[0],revision:"3",horsEtab:"Non",mediateur:"",
- saisons:["Été","Hiver"],planning:{"Été":{date:"",creneau:"Matin"},"Hiver":{date:"",creneau:"Matin"}},equipements:[eq()],fiches:[],obs:"",sigTech:"",sigClient:"",tarifs:JSON.parse(JSON.stringify(ls.get(KEY.tar,DEFT)))});
-const norm=x=>{const b=blank();return{...b,...x,entreprise:{...b.entreprise,...x.entreprise},client:{...b.client,...x.client},tarifs:{...DEFT,...(x.tarifs||{})},planning:{...b.planning,...(x.planning||{})},fiches:Array.isArray(x.fiches)?x.fiches:[],
+ saisons:["Été","Hiver"],planning:{"Été":{date:"",creneau:"Matin"},"Hiver":{date:"",creneau:"Matin"}},equipements:[eq()],lignes:[],fiches:[],obs:"",sigTech:"",sigClient:"",tarifs:JSON.parse(JSON.stringify(ls.get(KEY.tar,DEFT)))});
+const norm=x=>{const b=blank();return{...b,...x,entreprise:{...b.entreprise,...x.entreprise},client:{...b.client,...x.client},tarifs:{...DEFT,...(x.tarifs||{})},planning:{...b.planning,...(x.planning||{})},fiches:Array.isArray(x.fiches)?x.fiches:[],lignes:Array.isArray(x.lignes)?x.lignes:[],
  equipements:(x.equipements||[]).map(e=>({...eq(),...e,ue:{...unit(),...e.ue},ui:{ref:"",serie:"",...e.ui}}))}};
 let S=ls.get(KEY.draft,null);S=S?norm(S):blank();
 
@@ -161,7 +164,8 @@ function calc(){const T=S.tarifs;const nbV=nbVisites();
   else if(e.type)visit=num(T[e.type]);
   const base=visit*nbV;const et=e.etanch?num(e.etanchPrix):0;
   return{i,e,visit,nbV,base,et,tot:base+et}});
- const ht=lines.reduce((a,l)=>a+l.tot,0);const rate=S.tva==="20"?0.2:0.1;
+ const extra=(S.lignes||[]).reduce((a,l)=>a+num(l.prix),0);
+ const ht=lines.reduce((a,l)=>a+l.tot,0)+extra;const rate=S.tva==="20"?0.2:0.1;
  return{lines,ht,tva:ht*rate,ttc:ht*(1+rate),rate}}
 const typeLabel=e=>e.type?(TL[e.type]+(e.type==="multi"?" ("+(parseInt(e.nbUI)||0)+" unité(s) intérieure(s))":"")):"Type non précisé";
 const fluideLabel=e=>e.fluide==="Autre"?e.fluideAutre:e.fluide;
@@ -183,9 +187,14 @@ function eqHtml(e,i){
   ${tx("Référence unité intérieure",b+".ui.ref")}${tx("N° de série unité intérieure",b+".ui.serie")}
   ${tx("Puissance (kW)",b+".ue.kw","number")}${tx("Charge de fluide (kg)",b+".charge","number")}
   ${tx("Emplacement (vide = adresse du client)",b+".lieu")}</div>
+ ${(e.type==="gainable"||e.type==="tertiaire")?`<div class="row" style="margin-top:12px"><b>Options gainable</b>
+  <label class="chk"><input type="checkbox" data-bool="${b}.zoning" ${e.zoning?"checked":""}> Zoning</label>
+  <label class="chk"><input type="checkbox" data-bool="${b}.wifi" ${e.wifi?"checked":""}> Connexion internet (Wi-Fi) du système</label></div>
+  ${e.zoning?`<div class="grid">${tx("Zoning : marque",b+".zMarque")}${tx("Nombre de sorties (zones)",b+".zSorties","number")}${tx("Nombre de thermostats",b+".zThermos","number")}${tx("N° de série du zoning",b+".zSerie")}${tx("N° de série thermostat(s)",b+".zSerieTh")}</div>`:""}
+  ${e.wifi?`<div class="grid" style="margin-top:8px">${tx("Wi-Fi : marque et référence du module",b+".wMarque")}${tx("Wi-Fi : n° de série",b+".wSerie")}</div>`:""}`:""}
  <div class="row" style="margin-top:14px"><b>Prestations incluses (plusieurs choix possibles)</b>
   <div class="sec-btns"><button class="mini" onclick="setAll(${i},true)">Tout cocher</button><button class="mini" onclick="setAll(${i},false)">Tout décocher</button><button class="mini" onclick="setAll(${i},'def')">Réinitialiser selon le type</button></div></div>
- ${Object.values(GROUPS).map(([t,l])=>`<div class="row"><b>${esc(t)}</b>${chk(b+".controles",l)}</div>`).join("")}
+ ${Object.entries(GROUPS).filter(([k])=>(k!=="zoning"||e.zoning)&&(k!=="wifi"||e.wifi)).map(([k,[t,l]])=>`<div class="row"><b>${esc(t)}</b>${chk(b+".controles",l)}</div>`).join("")}
  <div class="row"><b>Contrôle d'étanchéité (charge ≥ 5 teqCO₂)</b>
   <label class="chk"><input type="checkbox" data-bool="${b}.etanch" ${e.etanch?"checked":""}> Ajouter le contrôle d'étanchéité à ce contrat</label>
   ${e.etanch?`<div class="grid" style="max-width:260px">${tx("Prix du contrôle (€ HT)",b+".etanchPrix","number")}</div>`:""}</div>
@@ -217,11 +226,13 @@ function render(){
   <div class="row"><b>Paiement</b>${rad("paiement",PAIEMENTS)}</div>
   ${part?`<div class="row"><b>Contrat signé à domicile ou à distance (droit de rétractation de 14 jours)</b>${rad("horsEtab",["Oui","Non"])}</div>
   <div class="grid">${tx("Médiateur de la consommation (nom et coordonnées)","mediateur")}</div>`:""}</section>
- <section class="card"><h2>Programmation des visites</h2>
-  ${(S.saisons||[]).length?(S.saisons||[]).map(sa=>`<div class="row"><b>Visite ${esc(sa.toLowerCase())}</b><div class="grid" style="max-width:560px;align-items:end">${tx("Date de la visite","planning."+sa+".date","date")}<div>${rad("planning."+sa+".creneau",["Matin","Après-midi"])}</div></div>${st(sa)}</div>`).join(""):'<p class="hint">Cochez au moins une intervention (été, hiver) dans le bloc Contrat pour programmer les visites.</p>'}
+ <section class="card"><h2>Programmation des visites <button class="mini" onclick="exportIcs()">⬇ Toutes les visites (.ics)</button></h2>
+  ${(S.saisons||[]).length?(S.saisons||[]).map(sa=>`<div class="row"><b>Visite ${esc(sa.toLowerCase())}</b><div class="grid" style="max-width:560px;align-items:end">${tx("Date de la visite","planning."+sa+".date","date")}<div>${rad("planning."+sa+".creneau",["Matin","Après-midi"])}</div></div>${st(sa)}<div class="sec-btns"><button class="mini" onclick="openGcal('${sa}')">📅 Ajouter à Google Agenda</button><button class="mini" onclick="exportIcs('${sa}')">⬇ Fichier agenda (.ics)</button></div></div>`).join(""):'<p class="hint">Cochez au moins une intervention (été, hiver) dans le bloc Contrat pour programmer les visites.</p>'}
  </section>
  ${S.equipements.map(eqHtml).join("")}
  <button class="add" onclick="addEq()">＋ Ajouter un équipement</button>
+ <section class="card"><h2>Autres lignes de tarif <button onclick="addLigne()">＋ Ajouter une ligne</button></h2>
+  ${(S.lignes||[]).length?S.lignes.map((l,i)=>`<div class="grid" style="align-items:end;margin-bottom:8px">${tx("Libellé","lignes."+i+".lib")}${tx("Prix HT (€)","lignes."+i+".prix","number")}<div><button class="danger" onclick="delLigne(${i})">Supprimer la ligne</button></div></div>`).join(""):'<p class="hint">Aucune ligne. Ajoutez par exemple un zoning, un module Wi-Fi, un forfait ou une remise (prix négatif). Montant forfaitaire, non multiplié par le nombre de visites.</p>'}</section>
  <section class="card"><h2>Récapitulatif du prix</h2><div id="recap"></div></section>
  <section class="card"><h2>Conditions particulières</h2>
   <textarea data-p="obs" placeholder="Remarques ou conditions propres à ce contrat (imprimées avant les signatures)">${esc(S.obs)}</textarea></section>
@@ -240,13 +251,16 @@ function initSig(sel,key,o=S,cb=upd){
  c.onpointerup=()=>{if(!on)return;on=false;o[key]=c.toDataURL("image/png");draft();cb()};
 }
 function clearSig(){S.sigTech="";S.sigClient="";render();draft()}
-function setAll(i,mode){S.equipements[i].controles=mode==="def"?defaults(S.equipements[i].type):(mode?[...allItems]:[]);render();draft()}
+function setAll(i,mode){const e=S.equipements[i];e.controles=mode==="def"?defFor(e,e.type):(mode?allItemsFor(e):[]);render();draft()}
+function addLigne(){S.lignes.push({lib:"",prix:""});render();draft()}
+function delLigne(i){S.lignes.splice(i,1);render();draft()}
 
 /* ---------- Mise à jour en direct ---------- */
 function recapHtml(){const K=calc();
  const rows=K.lines.map(l=>`<tr><td>Équipement n°${l.i+1} – ${esc(typeLabel(l.e))}<br><small>${eur(l.visit)} par visite × ${l.nbV} visite${l.nbV>1?"s":""}</small></td><td style="text-align:right">${eur(l.base)}</td></tr>`
   +(l.et?`<tr><td>Contrôle d'étanchéité – équipement n°${l.i+1}</td><td style="text-align:right">${eur(l.et)}</td></tr>`:"")).join("");
- return `<table><tr><th>Désignation</th><th style="text-align:right">Prix annuel HT</th></tr>${rows}
+ const xr=(S.lignes||[]).filter(l=>String(l.lib).trim()||String(l.prix).trim()).map(l=>`<tr><td>${esc(l.lib)||"Ligne complémentaire"}</td><td style="text-align:right">${eur(num(l.prix))}</td></tr>`).join("");
+ return `<table><tr><th>Désignation</th><th style="text-align:right">Prix annuel HT</th></tr>${rows}${xr}
  <tr class="tot"><td>Total HT</td><td style="text-align:right">${eur(K.ht)}</td></tr>
  <tr><td>TVA ${S.tva} %</td><td style="text-align:right">${eur(K.tva)}</td></tr>
  <tr class="tot"><td>Total TTC</td><td style="text-align:right">${eur(K.ttc)}</td></tr></table>`}
@@ -270,6 +284,11 @@ function contractHtml(){
   <td>${v(e.ue.ref)}<br><small>N° série : ${v(e.ue.serie)}</small></td><td>${v(e.ui.ref)}<br><small>N° série : ${v(e.ui.serie)}</small></td>
   <td>${v(e.ue.kw)} kW</td><td>${v(fluideLabel(e))} / ${v(e.charge)} kg</td>
   <td>${v(e.lieu||[C.adresse,C.cp,C.ville].filter(Boolean).join(" "))}</td></tr>`).join("");
+ const extrasOpt=S.equipements.map((e,i)=>{const a=[];
+  if(e.zoning)a.push(`zoning de marque ${v(e.zMarque)}, ${v(e.zSorties)} sortie(s), ${v(e.zThermos)} thermostat(s), n° de série ${v(e.zSerie)}${String(e.zSerieTh||"").trim()?`, thermostat(s) n° ${esc(e.zSerieTh)}`:""}`);
+  if(e.wifi)a.push(`connexion internet Wi-Fi : ${v(e.wMarque)}, n° de série ${v(e.wSerie)}`);
+  return a.length?`<li>Équipement n°${i+1} : ${a.join(" ; ")}</li>`:""}).join("");
+ const xrows=(S.lignes||[]).filter(l=>String(l.lib).trim()||String(l.prix).trim()).map(l=>`<tr><td>${esc(l.lib)||"Ligne complémentaire"}</td><td style="text-align:right">${eur(num(l.prix))}</td></tr>`).join("");
  const plaques=S.equipements.map((e,i)=>e.photo?`<img class="plaque" src="${e.photo}" alt="Plaque signalétique équipement ${i+1}">`:"").join("");
  const presta=S.equipements.map((e,i)=>{const sel=e.controles||[];
   const g=Object.values(GROUPS).map(([t,l])=>{const c=l.filter(x=>sel.includes(x));return c.length?`<b>${esc(t)}</b><ul>${c.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}).join("");
@@ -289,6 +308,7 @@ function contractHtml(){
  <p>Le présent contrat confie au Prestataire l'entretien préventif du ou des équipements décrits ci-dessous.</p>
  <table><tr><th>N°</th><th>Type</th><th>Marque</th><th>Unité extérieure</th><th>Unité intérieure</th><th>Puissance</th><th>Fluide / charge</th><th>Emplacement</th></tr>${rowsEq}</table>
  ${plaques?`<p>${plaques}</p>`:""}
+ ${extrasOpt?`<p><b>Options installées</b></p><ul>${extrasOpt}</ul>`:""}
  <p>Si la charge en fluide atteint le seuil réglementaire de contrôle d'étanchéité (5 tonnes équivalent CO₂), ce contrôle périodique s'ajoute aux prestations ci-dessous et figure comme ligne distincte à l'article 5.</p>
 
  <h3>Article 2 – Prestations incluses</h3>
@@ -314,8 +334,9 @@ function contractHtml(){
  <li>le déplacement ou le remplacement complet de l'appareil.</li></ul>
 
  <h3>Article 5 – Prix et paiement</h3>
- <p>Les tarifs s'entendent par visite. Le prix annuel est le prix d'une visite multiplié par le nombre de visites prévues à l'article 3.</p>
+ <p>Les tarifs s'entendent par visite. Le prix annuel est le prix d'une visite multiplié par le nombre de visites prévues à l'article 3.${xrows?" Les lignes complémentaires sont des montants forfaitaires annuels, non multipliés par le nombre de visites.":""}</p>
  <table><tr><th>Désignation</th><th style="text-align:right">Prix annuel HT</th></tr>${rowsPrix}
+ ${xrows}
  <tr class="tot"><td>Total HT</td><td style="text-align:right">${eur(K.ht)}</td></tr>
  <tr><td>TVA ${esc(S.tva)} %</td><td style="text-align:right">${eur(K.tva)}</td></tr>
  <tr class="tot"><td>Total TTC</td><td style="text-align:right">${eur(K.ttc)}</td></tr></table>
@@ -351,9 +372,12 @@ $("#app").addEventListener("input",e=>{const t=e.target;if(!t.dataset.p)return;s
  if(t.dataset.p.startsWith("entreprise."))ls.set(KEY.ent,S.entreprise);upd();draft()});
 $("#app").addEventListener("change",async e=>{const t=e.target;
  if(t.dataset.arr){let a=getP(S,t.dataset.arr);if(!a){setP(S,t.dataset.arr,[]);a=getP(S,t.dataset.arr)}const i=a.indexOf(t.value);if(t.checked&&i<0)a.push(t.value);if(!t.checked&&i>=0)a.splice(i,1);if(t.dataset.arr==="saisons")render();else upd();draft()}
- else if(t.dataset.bool){setP(S,t.dataset.bool,t.checked);render();draft()}
+ else if(t.dataset.bool){setP(S,t.dataset.bool,t.checked);
+  const mm=t.dataset.bool.match(/^equipements\.(\d+)\.(zoning|wifi)$/);
+  if(mm){const e=S.equipements[+mm[1]];const items=GROUPS[mm[2]][1];e.controles=(e.controles||[]).filter(x=>!items.includes(x));if(t.checked)e.controles.push(...items)}
+  render();draft()}
  else if(t.dataset.rad){setP(S,t.dataset.rad,t.value);
-  const m=t.dataset.rad.match(/^equipements\.(\d+)\.type$/);if(m)S.equipements[+m[1]].controles=defaults(t.value);
+  const m=t.dataset.rad.match(/^equipements\.(\d+)\.type$/);if(m){const e=S.equipements[+m[1]];e.controles=defFor(e,t.value)}
   render();draft()}
  else if(t.dataset.photo!==undefined&&t.files[0]){S.equipements[+t.dataset.photo].photo=await shrink(t.files[0]);render();draft()}});
 function shrink(file){return new Promise(res=>{const im=new Image();const u=URL.createObjectURL(file);
@@ -392,6 +416,8 @@ function fEqHtml(e,i,f){const fe=f.eqs[i],b=`eqs.${i}`,cb=`equipements.${i}`;
   ${ftx("T° soufflage ou départ (°C)",b+".tsouf","number")}${ftx("T° reprise ou retour (°C)",b+".trep","number")}${ftx("Fluide ajouté (kg)",b+".ajout","number")}</div>
  <div class="row" style="margin-top:12px"><b>Identification de la machine <span class="hint noprint">(modifie aussi le contrat)</span></b></div>
  <div class="grid">${tx("Marque",cb+".marque")}${tx("Référence unité extérieure",cb+".ue.ref")}${tx("N° de série unité extérieure",cb+".ue.serie")}${tx("Référence unité intérieure",cb+".ui.ref")}${tx("N° de série unité intérieure",cb+".ui.serie")}${tx("Puissance (kW)",cb+".ue.kw","number")}${tx("Charge de fluide (kg)",cb+".charge","number")}</div>
+ ${e.zoning?`<div class="grid" style="margin-top:8px">${tx("Zoning : marque",cb+".zMarque")}${tx("Nombre de sorties",cb+".zSorties","number")}${tx("Nombre de thermostats",cb+".zThermos","number")}${tx("N° de série du zoning",cb+".zSerie")}${tx("N° de série thermostat(s)",cb+".zSerieTh")}</div>`:""}
+ ${e.wifi?`<div class="grid" style="margin-top:8px">${tx("Wi-Fi : marque et référence du module",cb+".wMarque")}${tx("Wi-Fi : n° de série",cb+".wSerie")}</div>`:""}
  ${e.photo?`<div class="photo"><img src="${e.photo}" alt="Plaque signalétique"></div>`:""}
  </section>`}
 function renderF(){
@@ -429,6 +455,26 @@ $("#fApp").addEventListener("input",e=>{const t=e.target;
 $("#fApp").addEventListener("change",e=>{const t=e.target;
  if(t.dataset.farr){const a=getP(F(),t.dataset.farr);const i=a.indexOf(t.value);if(t.checked&&i<0)a.push(t.value);if(!t.checked&&i>=0)a.splice(i,1);draft()}
  else if(t.dataset.frad){setP(F(),t.dataset.frad,t.value);renderF();draft()}});
+
+/* ---------- Planning : agenda en ligne ---------- */
+function visitEvent(sa){const pl=(S.planning||{})[sa]||{};if(!pl.date)return null;
+ const am=pl.creneau==="Après-midi",C=S.client;
+ const loc=[C.adresse,[C.cp,C.ville].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+ const desc=["Contrat n° "+S.contrat,C.tel?"Tél. client : "+C.tel:"",C.email?"E-mail : "+C.email:"",...S.equipements.map((e,i)=>"Équipement "+(i+1)+" : "+typeLabel(e)+(e.marque?" "+e.marque:"")),"Créneau : "+(am?"après-midi":"matin")].filter(Boolean).join("\n");
+ return{title:"Entretien clim – "+(C.nom||"Client")+" – "+sa,loc,desc,date:pl.date,s:am?"14:00":"09:00",e:am?"17:00":"12:00"}}
+const icsEsc=t=>String(t).replace(/\\/g,"\\\\").replace(/;/g,"\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n");
+function icsFor(list){const now=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
+ const t=(d,h)=>d.replace(/-/g,"")+"T"+h.replace(":","")+"00";
+ const ev=list.map(([sa,v])=>["BEGIN:VEVENT","UID:"+S.id+"-"+slug(sa)+"-"+v.date+"@contrat-entretien","DTSTAMP:"+now,"DTSTART:"+t(v.date,v.s),"DTEND:"+t(v.date,v.e),
+  "SUMMARY:"+icsEsc(v.title),"LOCATION:"+icsEsc(v.loc),"DESCRIPTION:"+icsEsc(v.desc),"BEGIN:VALARM","TRIGGER:-P1D","ACTION:DISPLAY","DESCRIPTION:"+icsEsc(v.title),"END:VALARM","END:VEVENT"].join("\r\n")).join("\r\n");
+ return "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Contrat entretien//FR\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n"+ev+"\r\nEND:VCALENDAR\r\n"}
+function dlText(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function exportIcs(sa){const l=(sa?[sa]:(S.saisons||[])).map(x=>[x,visitEvent(x)]).filter(x=>x[1]);
+ if(!l.length){toast("Renseignez d'abord la date de la visite");return}
+ dlText("visite_"+slug(S.client.nom)+"_"+(sa?slug(sa):"toutes")+".ics",icsFor(l),"text/calendar;charset=utf-8")}
+function gcalUrl(sa){const v=visitEvent(sa);if(!v)return"";const d=v.date.replace(/-/g,"");
+ return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent(v.title)+"&dates="+d+"T"+v.s.replace(":","")+"00/"+d+"T"+v.e.replace(":","")+"00&ctz=Europe/Paris&location="+encodeURIComponent(v.loc)+"&details="+encodeURIComponent(v.desc)}
+function openGcal(sa){const u=gcalUrl(sa);if(!u){toast("Renseignez d'abord la date de la visite");return}window.open(u,"_blank","noopener")}
 
 /* ---------- Tarifs ---------- */
 function openTarifs(){$("#tarifsFields").innerHTML=Object.keys(DEFT).map(k=>`<label class="f">${TLAB[k]}<input type="number" step="any" inputmode="decimal" data-t="${k}" value="${esc(S.tarifs[k])}"></label>`).join("");$("#tarifs").classList.add("open")}
